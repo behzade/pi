@@ -1,0 +1,19 @@
+diff --git a/build.rs b/build.rs
+index 64329e1..9c47c82 100644
+--- a/build.rs
++++ b/build.rs
+@@ -162,5 +162,7 @@ fn build_ghostty_linux(
+         .args(["build", "--prefix"])
+         .arg(&staging_prefix)
++        .arg("--system")
++        .arg(&package_cache)
+         .args(GHOSTTY_BUILD_OPTIONS)
+         .arg("-Drenderer=opengl")
+         .status();
+@@ -363,4 +365,6 @@ fn build_ghostty(
+         .args(["build", "--prefix"])
+         .arg(&staging_prefix)
++        .arg("--system")
++        .arg(&package_cache)
+         .args(GHOSTTY_BUILD_OPTIONS);
+     let status = command.status();

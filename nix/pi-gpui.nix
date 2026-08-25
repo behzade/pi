@@ -1,4 +1,5 @@
 {
+  callPackage,
   coreutils,
   craneLib,
   lib,
@@ -73,10 +74,20 @@ let
       cp -r ${vendoredPathSources}/third_party "$out/third_party"
     '';
   };
+  ghosttyZigDeps = callPackage ./ghostty-zig-deps.nix { };
 
   commonArgs = {
     inherit pname src version;
     cargoLock = ../apps/pi-gpui/Cargo.lock;
+    GHOSTTY_ZIG_PACKAGE_CACHE_DIR = ghosttyZigDeps;
+    overrideVendorCargoPackage =
+      package: crate:
+      if package.name == "gpui-libghostty" && package.version == "0.1.4" then
+        crate.overrideAttrs (_old: {
+          patches = [ ./patches/gpui-libghostty-system-deps.patch ];
+        })
+      else
+        crate;
     outputHashes = {
       "git+https://github.com/proptest-rs/proptest?rev=3dca198a8fef1b32e3a66f1e1897c955b4dc5b5b#3dca198a8fef1b32e3a66f1e1897c955b4dc5b5b" =
         "sha256-p5NTcHhruI8QQvANACg8AMRVNmuvGxs2NLit+/8PaWo=";
