@@ -24,15 +24,15 @@ function harness() {
   return { handlers, snapshots, ctx };
 }
 
-async function startBash(handlers, ctx, toolCallId = "bash-call") {
+async function startAsyncProcess(handlers, ctx, toolCallId = "bash-call") {
   await handlers.get("tool_execution_start")({
     toolCallId,
     toolName: "bash",
-    args: { command: "cargo check" },
+    args: { command: "cargo test", execution: "async", label: "Long tests" },
   }, ctx);
 }
 
-async function finishDetachedBash(handlers, ctx, id = "pi-process", toolCallId = "bash-call") {
+async function finishAsyncStart(handlers, ctx, id = "pi-process", toolCallId = "bash-call") {
   await handlers.get("tool_execution_end")({
     toolCallId,
     toolName: "bash",
@@ -41,75 +41,65 @@ async function finishDetachedBash(handlers, ctx, id = "pi-process", toolCallId =
   }, ctx);
 }
 
-test("publishes detached bash processes and their settlements", async () => {
+async function settleAsyncProcess(handlers, ctx, id = "pi-process", customType = "process-session-status") {
+  await handlers.get("message_end")({
+    message: {
+      role: "custom",
+      customType,
+      details: { id, state: "exited", exitCode: 7 },
+    },
+  }, ctx);
+}
+
+test("publishes active async processes and removes them on settlement", async () => {
   const { handlers, snapshots, ctx } = harness();
   await handlers.get("session_start")({}, ctx);
-  await startBash(handlers, ctx);
-  await finishDetachedBash(handlers, ctx);
+  await startAsyncProcess(handlers, ctx);
+  await finishAsyncStart(handlers, ctx);
 
   assert.deepEqual(snapshots.at(-1), [{
-    name: "pi-process",
-    command: "cargo check",
+    name: "Long tests",
+    command: "cargo test",
     state: "running",
   }]);
 
-  await handlers.get("message_end")({
-    message: {
-      role: "custom",
-      customType: "process-session-result",
-      details: { id: "pi-process", state: "exited", exitCode: 7 },
-    },
-  }, ctx);
-
-  assert.deepEqual(snapshots.at(-1), [{
-    name: "pi-process",
-    command: "cargo check",
-    state: "exited",
-    exitCode: 7,
-  }]);
+  await settleAsyncProcess(handlers, ctx);
+  assert.deepEqual(snapshots.at(-1), []);
 });
 
-test("applies completion delivered before the detached bash result", async () => {
+test("does not resurrect an async process settled before its start result", async () => {
   const { handlers, snapshots, ctx } = harness();
   await handlers.get("session_start")({}, ctx);
-  await startBash(handlers, ctx);
-  await handlers.get("message_end")({
-    message: {
-      role: "custom",
-      customType: "process-session-result",
-      details: { id: "pi-process", state: "completed", exitCode: 0 },
-    },
-  }, ctx);
-  await finishDetachedBash(handlers, ctx);
+  await startAsyncProcess(handlers, ctx);
+  await settleAsyncProcess(handlers, ctx, "pi-process", "process-session-result");
+  await finishAsyncStart(handlers, ctx);
 
-  assert.deepEqual(snapshots.at(-1), [{
-    name: "pi-process",
-    command: "cargo check",
-    state: "completed",
-    exitCode: 0,
-  }]);
+  assert.deepEqual(snapshots, [[]]);
 });
 
-test("does not publish short or failed bash calls", async () => {
+test("ignores synchronous and failed async calls", async () => {
   const { handlers, snapshots, ctx } = harness();
   await handlers.get("session_start")({}, ctx);
 
-  for (const [toolCallId, isError, details] of [
-    ["short", false, undefined],
-    ["failed", true, { id: "pi-failed", state: "running" }],
-  ]) {
-    await handlers.get("tool_execution_start")({
-      toolCallId,
-      toolName: "bash",
-      args: { command: "printf ok" },
-    }, ctx);
-    await handlers.get("tool_execution_end")({
-      toolCallId,
-      toolName: "bash",
-      result: { details },
-      isError,
-    }, ctx);
-  }
+  await handlers.get("tool_execution_start")({
+    toolCallId: "sync",
+    toolName: "bash",
+    args: { command: "cargo test" },
+  }, ctx);
+  await handlers.get("tool_execution_end")({
+    toolCallId: "sync",
+    toolName: "bash",
+    result: { details: undefined },
+    isError: false,
+  }, ctx);
+
+  await startAsyncProcess(handlers, ctx, "failed");
+  await handlers.get("tool_execution_end")({
+    toolCallId: "failed",
+    toolName: "bash",
+    result: { details: { id: "pi-failed", state: "running" } },
+    isError: true,
+  }, ctx);
 
   assert.deepEqual(snapshots, [[]]);
 });
