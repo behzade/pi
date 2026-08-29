@@ -20,7 +20,8 @@ separate `nix-config` repo.
   model selection, and cancellation.
 - A first-party Codex Web Search tool using the active Codex login and Codex's
   direct search endpoint, with bounded cited output and no provider router.
-- Stateless MCP access through a pinned `mcp-cli`.
+- Token-efficient MCP access through a pinned `pi-mcp-adapter`, with lazy
+  servers and one on-demand proxy tool.
 - Server-side OpenAI compaction for long sessions.
 - Compact read, edit, and shell output with syntax-highlighted diffs.
 - First-party TypeScript host integrations use Effect v4 for async work, typed failures,
@@ -47,6 +48,9 @@ separate `nix-config` repo.
 - [`extensions/project-tools`](extensions/project-tools) loads strict tool
   manifests and Effect v4 handlers from trusted project `.pi/project-tools`
   directories. These handlers run in Pi's host process, not the shell sandbox.
+- [`pi-mcp-adapter`](https://github.com/nicobailon/pi-mcp-adapter) supplies lazy
+  MCP discovery, authentication, and tool calls from shared `.mcp.json`
+  configuration without loading every server schema into the prompt.
 - [`extensions/codex-web-search.ts`](extensions/codex-web-search.ts) exposes
   one compact Codex Web Search tool; direct request shaping and response
   validation live in `codex-web-search-core.ts`.

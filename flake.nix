@@ -25,18 +25,19 @@
         let
           pkgs = pkgsFor system;
           coreExtensions = pkgs.callPackage ./nix/pi-core-extensions.nix { };
-          mcpCli = pkgs.callPackage ./nix/pi-mcp-cli.nix { };
+          mcpAdapter = pkgs.callPackage ./nix/pi-mcp-adapter.nix { };
           sandbox = piNono.packages.${system}.default;
           denseTools = pkgs.callPackage ./nix/pi-dense-tools.nix { };
           sessionAgents = pkgs.callPackage ./nix/pi-session-agents.nix { };
           openaiServerCompaction = pkgs.callPackage ./nix/pi-openai-server-compaction.nix { };
           projectTools = pkgs.callPackage ./nix/pi-project-tools.nix { };
-          piTerminal = pkgs.callPackage ./nix/pi-terminal.nix { inherit mcpCli; };
+          piTerminal = pkgs.callPackage ./nix/pi-terminal.nix { };
           pi = piTerminal;
           agent = pkgs.callPackage ./nix/pi-agent.nix {
             inherit
               coreExtensions
               denseTools
+              mcpAdapter
               openaiServerCompaction
               piTerminal
               projectTools
@@ -51,7 +52,7 @@
           core-extensions = coreExtensions;
           inherit pi;
           pi-terminal = piTerminal;
-          mcp-cli = mcpCli;
+          mcp-adapter = mcpAdapter;
           dense-tools = denseTools;
           openai-server-compaction = openaiServerCompaction;
           project-tools = projectTools;
@@ -83,16 +84,17 @@
           pkgs = pkgsFor system;
           coreExtensions = pkgs.callPackage ./nix/pi-core-extensions.nix { };
           denseTools = pkgs.callPackage ./nix/pi-dense-tools.nix { };
-          mcpCli = pkgs.callPackage ./nix/pi-mcp-cli.nix { };
+          mcpAdapter = pkgs.callPackage ./nix/pi-mcp-adapter.nix { };
           sandbox = piNono.packages.${system}.default;
           openaiServerCompaction = pkgs.callPackage ./nix/pi-openai-server-compaction.nix { };
           projectTools = pkgs.callPackage ./nix/pi-project-tools.nix { };
-          piTerminal = pkgs.callPackage ./nix/pi-terminal.nix { inherit mcpCli; };
+          piTerminal = pkgs.callPackage ./nix/pi-terminal.nix { };
           sessionAgents = pkgs.callPackage ./nix/pi-session-agents.nix { };
           agent = pkgs.callPackage ./nix/pi-agent.nix {
             inherit
               coreExtensions
               denseTools
+              mcpAdapter
               openaiServerCompaction
               piTerminal
               projectTools
@@ -109,6 +111,7 @@
             test "$(readlink ${agent}/extensions/node_modules)" = ${coreExtensions}/node_modules
             test "$(readlink ${agent}/extensions/sandbox)" = ${sandbox}
             test -f ${agent}/extensions/sandbox/index.ts
+            test -f ${agent}/extensions/pi-mcp-adapter/index.ts
             test -f ${agent}/extensions/codex-web-search.ts
             test -f ${agent}/extensions/lib/codex-web-search-core.ts
             test ! -e ${agent}/extensions/codex-web-search-core.ts
@@ -117,6 +120,7 @@
             HOME="$PWD/home" PI_OFFLINE=1 pi --no-extensions -e ${sandbox}/index.ts --list-models >/dev/null
             test -L ${agent}/prompts
             test -f ${agent}/prompts/commit.md
+            test -f ${agent}/skills/mcp-scripting/SKILL.md
             touch "$out"
           '';
           core-extensions = pkgs.runCommand "pi-core-extensions-test" { nativeBuildInputs = [ pkgs.nodejs ]; } ''
@@ -140,8 +144,11 @@
             touch "$out"
           '';
 
-          mcp-cli = pkgs.runCommand "pi-mcp-cli-test" { nativeBuildInputs = [ mcpCli ]; } ''
-            test "$(mcp-cli --version)" = "mcp-cli v0.3.0"
+          mcp-adapter = pkgs.runCommand "pi-mcp-adapter-test" { nativeBuildInputs = [ piTerminal pkgs.nodejs ]; } ''
+            test "$(node -p 'require(\"${mcpAdapter}/package.json\").version')" = "2.29.0"
+            test -f ${mcpAdapter}/node_modules/@modelcontextprotocol/client/package.json
+            mkdir home
+            HOME="$PWD/home" PI_OFFLINE=1 pi --no-extensions -e ${mcpAdapter}/index.ts --list-models >/dev/null
             touch "$out"
           '';
           dense-tools = pkgs.runCommand "pi-dense-tools-test" { nativeBuildInputs = [ denseTools ]; } ''

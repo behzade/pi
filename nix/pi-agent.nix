@@ -1,6 +1,7 @@
 {
   coreExtensions,
   denseTools,
+  mcpAdapter,
   openaiServerCompaction,
   piTerminal,
   projectTools,
@@ -25,6 +26,7 @@ stdenvNoCC.mkDerivation {
     ln -s ${../APPEND_SYSTEM.md} "$out/APPEND_SYSTEM.md"
 
     ln -s ${denseTools} "$out/extensions/dense-tools"
+    ln -s ${mcpAdapter} "$out/extensions/pi-mcp-adapter"
     ln -s ${openaiServerCompaction} "$out/extensions/openai-server-compaction"
     ln -s ${projectTools} "$out/extensions/project-tools"
     ln -s ${sandbox} "$out/extensions/sandbox"
@@ -42,7 +44,7 @@ stdenvNoCC.mkDerivation {
     ln -s ${../prompts} "$out/prompts"
     ln -s ${../themes/gruvbox-dark-hard.json} "$out/themes/gruvbox-dark-hard.json"
 
-    for skill in ${../skills}/*; do
+    for skill in ${mcpAdapter}/skills/* ${../skills}/*; do
       name="$(basename "$skill")"
       if [ -e "$out/skills/$name" ]; then
         echo "duplicate Pi skill: $name" >&2
