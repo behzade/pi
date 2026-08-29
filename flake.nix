@@ -1,13 +1,11 @@
 {
   description = "Behzad's reviewed Pi coding-agent extensions";
 
-  inputs.crane.url = "github:ipetkov/crane";
   inputs.piNono.url = "github:behzade/pi-nono";
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
 
   outputs =
     {
-      crane,
       nixpkgs,
       piNono,
       self,
@@ -34,22 +32,7 @@
           openaiServerCompaction = pkgs.callPackage ./nix/pi-openai-server-compaction.nix { };
           projectTools = pkgs.callPackage ./nix/pi-project-tools.nix { };
           piTerminal = pkgs.callPackage ./nix/pi-terminal.nix { inherit mcpCli; };
-          piGpui = pkgs.callPackage ./nix/pi-gpui.nix {
-            craneLib = crane.mkLib pkgs;
-            inherit piTerminal;
-          };
-          pi = pkgs.symlinkJoin {
-            name = "pi";
-            paths = [
-              piTerminal
-              piGpui
-            ];
-            meta = {
-              description = "Pi terminal and native GUI clients";
-              mainProgram = "pi";
-              platforms = pkgs.lib.platforms.darwin ++ pkgs.lib.platforms.linux;
-            };
-          };
+          pi = piTerminal;
           agent = pkgs.callPackage ./nix/pi-agent.nix {
             inherit
               coreExtensions
@@ -68,7 +51,6 @@
           core-extensions = coreExtensions;
           inherit pi;
           pi-terminal = piTerminal;
-          pi-gpui-deps = piGpui.cargoArtifacts;
           mcp-cli = mcpCli;
           dense-tools = denseTools;
           openai-server-compaction = openaiServerCompaction;
@@ -81,71 +63,17 @@
         system:
         let
           pkgs = pkgsFor system;
-          nativeRuntimeLibraries =
-            with pkgs;
-            lib.optionals stdenv.isLinux [
-              alsa-lib
-              at-spi2-atk
-              cairo
-              cups
-              dbus
-              expat
-              fontconfig
-              freetype
-              glib
-              gtk3
-              libdrm
-              libgbm
-              libGL
-              libcxx
-              libxml2
-              libx11
-              libxcb
-              libxcomposite
-              libxdamage
-              libxext
-              libxfixes
-              libxkbcommon
-              libxkbfile
-              libxrandr
-              libxshmfence
-              nspr
-              nss
-              pango
-              pciutils
-              stdenv.cc.cc
-              systemd
-              vulkan-loader
-              wayland
-            ];
         in
-        rec {
-          pi-gpui = pkgs.mkShell {
-            buildInputs = nativeRuntimeLibraries;
+        {
+          default = pkgs.mkShell {
             packages = with pkgs; [
-              cargo
-              clippy
               git
               nix
               nixfmt-tree
               neovim
               nodejs
-              pkg-config
-              rust-analyzer
-              rustc
-              rustfmt
-              rustPlatform.bindgenHook
-              zig_0_16
             ];
-            shellHook = ''
-              export CARGO_TARGET_DIR="$PWD/target"
-              ${pkgs.lib.optionalString pkgs.stdenv.isLinux ''
-                export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath nativeRuntimeLibraries}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-                export NIX_LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath nativeRuntimeLibraries}''${NIX_LD_LIBRARY_PATH:+:$NIX_LD_LIBRARY_PATH}"
-              ''}
-            '';
           };
-          default = pi-gpui;
         }
       );
 
@@ -160,10 +88,6 @@
           openaiServerCompaction = pkgs.callPackage ./nix/pi-openai-server-compaction.nix { };
           projectTools = pkgs.callPackage ./nix/pi-project-tools.nix { };
           piTerminal = pkgs.callPackage ./nix/pi-terminal.nix { inherit mcpCli; };
-          piGpui = pkgs.callPackage ./nix/pi-gpui.nix {
-            craneLib = crane.mkLib pkgs;
-            inherit piTerminal;
-          };
           sessionAgents = pkgs.callPackage ./nix/pi-session-agents.nix { };
           agent = pkgs.callPackage ./nix/pi-agent.nix {
             inherit
@@ -250,7 +174,6 @@
             test "$(pi --version)" = "0.84.2"
             touch "$out"
           '';
-          pi-gpui = piGpui;
           openai-server-compaction-tests = pkgs.runCommand "pi-openai-server-compaction-tests" {
             nativeBuildInputs = [ pkgs.nodejs ];
           } ''

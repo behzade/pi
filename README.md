@@ -62,11 +62,6 @@ separate `nix-config` repo.
 - [`apps/pi-terminal`](apps/pi-terminal) pins the upstream Pi 0.84.2 terminal
   client and the small Pi AI output-item hook needed for cached OpenAI
   compaction.
-- [`apps/pi-gpui`](apps/pi-gpui) is a native GPUI client for Pi's public RPC
-  mode. On Linux and macOS, the packaged desktop app starts the user's login
-  shell in the project directory and gives the captured project environment to
-  the RPC process. It is a distinct GPL-3.0-or-later module; the enclosing
-  repository's MIT license does not replace that module's license.
 - [`SYSTEM.md`](SYSTEM.md) is the base Pi system prompt. Nix fills its pinned
   Pi package path during the build.
 - [`APPEND_SYSTEM.md`](APPEND_SYSTEM.md) is the terse working contract appended
@@ -84,31 +79,12 @@ active definitions in a disposable viewer.
 
 ## Develop and test
 
-The project shell already provides Cargo, Node.js, and the other development
+The project shell already provides Node.js and the other development
 tools. Use them directly. Routine development and validation must not run Nix;
 run a Nix command only when the user asks for that exact check.
 
-Run the native Pi client without rebuilding the Home Manager configuration:
-
-```sh
-make run
-make run PROJECT=/path/to/project
-```
-
-The root `.envrc` enters the default Rust/GPUI development shell and sets the
-shared Cargo target directory. Do not create another development shell, Cargo
-target directory, cache, or dependency folder.
-
-Crane's GPUI dependency artifact is build-only, so garbage collection can remove
-it even while the installed application remains rooted. Keep only its current
-version across garbage collection with:
-
-```sh
-make root-gpui-deps
-```
-
-This maintains the ignored `result-pi-gpui-deps` GC root. Re-run it after GPUI
-dependency changes; replacing the link leaves older artifacts collectible.
+The root `.envrc` enters the default development shell. Do not create another
+development shell, cache, or dependency folder.
 
 Choose only the checks that cover the changed area. Start with an exact test or
 package check; do not run this whole list for every change. Nix packaging and
@@ -119,7 +95,6 @@ it updates the input and immediately runs that gate.
 ```sh
 npm run check --prefix extensions/project-tools
 npm run check --prefix extensions/subagents
-make check-gpui
 node --test \
   tests/governance.test.ts \
   tests/codex-web-search.test.ts \
