@@ -50,7 +50,8 @@ separate `nix-config` repo.
   directories. These handlers run in Pi's host process, not the shell sandbox.
 - [`pi-mcp-adapter`](https://github.com/nicobailon/pi-mcp-adapter) supplies lazy
   MCP discovery, authentication, and tool calls from shared `.mcp.json`
-  configuration without loading every server schema into the prompt.
+  configuration without loading every server schema into the prompt. Worker
+  orchestration lives outside Pi and is available through Farcaster's MCP tools.
 - [`extensions/codex-web-search.ts`](extensions/codex-web-search.ts) exposes
   one compact Codex Web Search tool; direct request shaping and response
   validation live in `codex-web-search-core.ts`.
