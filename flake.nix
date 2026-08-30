@@ -28,7 +28,6 @@
           mcpAdapter = pkgs.callPackage ./nix/pi-mcp-adapter.nix { };
           sandbox = piNono.packages.${system}.default;
           denseTools = pkgs.callPackage ./nix/pi-dense-tools.nix { };
-          sessionAgents = pkgs.callPackage ./nix/pi-session-agents.nix { };
           openaiServerCompaction = pkgs.callPackage ./nix/pi-openai-server-compaction.nix { };
           projectTools = pkgs.callPackage ./nix/pi-project-tools.nix { };
           piTerminal = pkgs.callPackage ./nix/pi-terminal.nix { };
@@ -42,13 +41,11 @@
               piTerminal
               projectTools
               sandbox
-              sessionAgents
               ;
           };
         in
         {
           inherit agent sandbox;
-          session-agents = sessionAgents;
           core-extensions = coreExtensions;
           inherit pi;
           pi-terminal = piTerminal;
@@ -89,7 +86,6 @@
           openaiServerCompaction = pkgs.callPackage ./nix/pi-openai-server-compaction.nix { };
           projectTools = pkgs.callPackage ./nix/pi-project-tools.nix { };
           piTerminal = pkgs.callPackage ./nix/pi-terminal.nix { };
-          sessionAgents = pkgs.callPackage ./nix/pi-session-agents.nix { };
           agent = pkgs.callPackage ./nix/pi-agent.nix {
             inherit
               coreExtensions
@@ -99,7 +95,6 @@
               piTerminal
               projectTools
               sandbox
-              sessionAgents
               ;
           };
         in
@@ -206,27 +201,10 @@
             node --experimental-strip-types --test test/project-tools.test.ts
             touch "$out"
           '';
-          session-agents-tests = pkgs.runCommand "pi-session-agents-tests" {
-            nativeBuildInputs = [ pkgs.nodejs ];
-          } ''
-            cp -R ${sessionAgents}/* .
-            chmod -R u+w .
-            cp ${self}/extensions/subagents/adapter.test.ts ${self}/extensions/subagents/core.test.ts .
-            mkdir -p node_modules/@earendil-works
-            ln -s ${piTerminal}/lib/pi-terminal/node_modules/@earendil-works/pi-agent-core node_modules/@earendil-works/pi-agent-core
-            ln -s ${piTerminal}/lib/pi-terminal/node_modules/@earendil-works/pi-ai node_modules/@earendil-works/pi-ai
-            ln -s ${piTerminal}/lib/pi-terminal/node_modules/@earendil-works/pi-coding-agent node_modules/@earendil-works/pi-coding-agent
-            ln -s ${piTerminal}/lib/pi-terminal/node_modules/typebox node_modules/typebox
-            node --test adapter.test.ts core.test.ts
-            node -e 'import("./index.ts")'
-            node --test ${self}/tests/session-agents-package.test.ts
-            touch "$out"
-          '';
           governance = pkgs.runCommand "pi-governance-tests" { nativeBuildInputs = [ pkgs.nodejs ]; } ''
             node --test \
               ${self}/tests/governance.test.ts \
               ${self}/tests/codex-web-search.test.ts \
-              ${self}/tests/session-agents-package.test.ts \
               ${self}/tests/prompt-contract.test.ts \
               ${self}/tests/prompt-inspector.test.ts \
               ${self}/tests/theme-and-rendering.test.ts \

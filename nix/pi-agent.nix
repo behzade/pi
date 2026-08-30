@@ -6,7 +6,6 @@
   piTerminal,
   projectTools,
   sandbox,
-  sessionAgents,
   stdenvNoCC,
 }:
 
@@ -30,7 +29,6 @@ stdenvNoCC.mkDerivation {
     ln -s ${openaiServerCompaction} "$out/extensions/openai-server-compaction"
     ln -s ${projectTools} "$out/extensions/project-tools"
     ln -s ${sandbox} "$out/extensions/sandbox"
-    ln -s ${sessionAgents} "$out/extensions/session-agents"
     ln -s ${coreExtensions}/lib "$out/extensions/lib"
     ln -s ${coreExtensions}/node_modules "$out/extensions/node_modules"
     ln -s ${coreExtensions}/notifications.ts "$out/extensions/notifications.ts"

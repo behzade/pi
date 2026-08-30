@@ -54,9 +54,6 @@ separate `nix-config` repo.
 - [`extensions/codex-web-search.ts`](extensions/codex-web-search.ts) exposes
   one compact Codex Web Search tool; direct request shaping and response
   validation live in `codex-web-search-core.ts`.
-- [`extensions/subagents`](extensions/subagents) owns persistent child Pi
-  sessions. Child completion automatically reprompts the parent; three
-  Effect-backed tools start, message, and control children.
 - The loose entrypoints under [`extensions`](extensions) are packaged together by
   `pi-core-extensions`; notifications, title animation, and user input use the same
   pinned Effect v4 runtime while Pi callbacks remain boundary adapters. Type `$`
@@ -98,11 +95,9 @@ it updates the input and immediately runs that gate.
 
 ```sh
 npm run check --prefix extensions/project-tools
-npm run check --prefix extensions/subagents
 node --test \
   tests/governance.test.ts \
   tests/codex-web-search.test.ts \
-  tests/session-agents-package.test.ts \
   tests/prompt-contract.test.ts \
   tests/prompt-inspector.test.ts \
   tests/theme-and-rendering.test.ts \
