@@ -1,5 +1,6 @@
 import { StringEnum, Type } from "@earendil-works/pi-ai";
 import { Effect } from "effect";
+import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http";
 import {
   DEFAULT_MAX_BYTES,
   DEFAULT_MAX_LINES,
@@ -57,24 +58,19 @@ const webSearchTool = defineTool({
         domains: params.domains,
       };
       return yield* Effect.gen(function* () {
-        const { response, text } = yield* Effect.tryPromise({
-          try: async (requestSignal) => {
-            const response = await fetch(CODEX_SEARCH_URL, {
-              method: "POST",
-              headers,
-              body: JSON.stringify(buildCodexSearchRequest(
-                query,
-                ctx.sessionManager.getSessionId(),
-                auth.model,
-                options,
-              )),
-              signal: requestSignal,
-            });
-            return { response, text: await response.text() };
-          },
-          catch: toError,
-        });
-        if (!response.ok) {
+        const client = yield* HttpClient.HttpClient;
+        const request = yield* HttpClientRequest.post(CODEX_SEARCH_URL).pipe(
+          HttpClientRequest.setHeaders(headers),
+          HttpClientRequest.bodyJson(buildCodexSearchRequest(
+            query,
+            ctx.sessionManager.getSessionId(),
+            auth.model,
+            options,
+          )),
+        );
+        const response = yield* client.execute(request);
+        const text = yield* response.text;
+        if (response.status < 200 || response.status >= 300) {
           return yield* Effect.fail(
             new Error(`Codex search error ${response.status}: ${text.slice(0, 500)}`),
           );
@@ -107,7 +103,7 @@ const webSearchTool = defineTool({
       );
     });
 
-    return Effect.runPromise(search, { signal });
+    return Effect.runPromise(search.pipe(Effect.provide(FetchHttpClient.layer)), { signal });
   },
 });
 

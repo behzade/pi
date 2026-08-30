@@ -9,6 +9,7 @@ import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import * as PiAI from "@earendil-works/pi-ai";
 import { openAICodexResponsesApi } from "@earendil-works/pi-ai/compat";
 import { Effect } from "effect";
+import { FetchHttpClient } from "effect/unstable/http";
 import { isRecord, loadConfig } from "./config.ts";
 import {
   executeContinuationCompaction,
@@ -308,8 +309,7 @@ export default function openaiServerCompactionExtension(pi: ExtensionAPI) {
           parallelToolCalls: true,
           reasoning,
           text,
-          signal: event.signal,
-        }), { signal: event.signal });
+        }).pipe(Effect.provide(FetchHttpClient.layer)), { signal: event.signal });
       }
     } catch (error) {
       if (event.signal.aborted === false && ctx.hasUI) {

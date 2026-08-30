@@ -27,6 +27,7 @@ import {
 } from "@earendil-works/pi-ai";
 import { complete } from "@earendil-works/pi-ai/compat";
 import { Effect, Schema } from "effect";
+import { HttpClient, HttpClientRequest } from "effect/unstable/http";
 import { isRecord } from "./config.ts";
 import {
   hostnameFromBaseUrl,
@@ -955,7 +956,6 @@ export const callRemoteCompactionEndpoint = Effect.fn(
   parallelToolCalls: boolean;
   reasoning?: ResponsesReasoningConfig;
   text?: ResponsesTextConfig;
-  signal?: AbortSignal;
 }) => {
   if (!supportsRemoteCompactionModel(params.model)) {
     return Effect.fail(new RemoteCompactionError({
@@ -963,46 +963,51 @@ export const callRemoteCompactionEndpoint = Effect.fn(
     }));
   }
 
-  return Effect.tryPromise({
-    try: async (signal) => {
-      const response = await fetch(remoteCompactionV2EndpointUrl(params.model), {
-        method: "POST",
-        headers: buildRemoteCompactionHeaders({
-          model: params.model,
-          apiKey: params.apiKey,
-          headers: params.headers,
-          sessionId: params.sessionId,
-        }),
-        body: JSON.stringify(buildRemoteCompactionRequestBody({
-          model: params.model,
-          input: params.input,
-          instructions: params.instructions,
-          tools: params.tools,
-          parallelToolCalls: params.parallelToolCalls,
-          reasoning: params.reasoning,
-          text: params.text,
-          sessionId: params.sessionId,
-        })),
-        signal: params.signal ?? signal,
-      });
+  return Effect.gen(function* () {
+    const client = yield* HttpClient.HttpClient;
+    const request = yield* HttpClientRequest.post(remoteCompactionV2EndpointUrl(params.model)).pipe(
+      HttpClientRequest.setHeaders(buildRemoteCompactionHeaders({
+        model: params.model,
+        apiKey: params.apiKey,
+        headers: params.headers,
+        sessionId: params.sessionId,
+      })),
+      HttpClientRequest.bodyJson(buildRemoteCompactionRequestBody({
+        model: params.model,
+        input: params.input,
+        instructions: params.instructions,
+        tools: params.tools,
+        parallelToolCalls: params.parallelToolCalls,
+        reasoning: params.reasoning,
+        text: params.text,
+        sessionId: params.sessionId,
+      })),
+    );
+    const response = yield* client.execute(request);
+    const responseText = yield* response.text;
 
-      if (!response.ok) {
-        const text = await response.text().catch(() => "");
-        throw new Error(`OpenAI remote compaction v2 failed (${response.status}): ${text || response.statusText}`);
-      }
+    if (response.status < 200 || response.status >= 300) {
+      return yield* Effect.fail(
+        new Error(`OpenAI remote compaction v2 failed (${response.status}): ${responseText}`),
+      );
+    }
 
-      const responseText = await response.text();
-      const parsed = parseRemoteCompactionV2Events(parseSseData(responseText));
-      return {
-        output: buildRemoteCompactionV2History(params.input, parsed.compactionItem),
-        usage: extractRemoteCompactionUsage(params.model, parsed.usage),
-      } satisfies RemoteCompactionResult;
-    },
-    catch: (cause) => new RemoteCompactionError({
-      message: cause instanceof Error ? cause.message : String(cause),
-      cause,
-    }),
-  });
+    const parsed = yield* Effect.try({
+      try: () => parseRemoteCompactionV2Events(parseSseData(responseText)),
+      catch: (cause) => cause,
+    });
+    return {
+      output: buildRemoteCompactionV2History(params.input, parsed.compactionItem),
+      usage: extractRemoteCompactionUsage(params.model, parsed.usage),
+    } satisfies RemoteCompactionResult;
+  }).pipe(
+    Effect.mapError((cause) => cause instanceof RemoteCompactionError
+      ? cause
+      : new RemoteCompactionError({
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      })),
+  );
 });
 
 export function buildRemoteCompactionDetails(

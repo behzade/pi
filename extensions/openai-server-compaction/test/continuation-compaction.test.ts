@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { describe, it } from "node:test";
 import { Cause, Effect, Exit, Option } from "effect";
+import { HttpClient, HttpClientResponse } from "effect/unstable/http";
 import {
   executeContinuationCompaction,
   responsesCompactionStreamLayer,
@@ -174,6 +175,29 @@ describe("executeContinuationCompaction", () => {
 });
 
 describe("remote compaction effects", () => {
+  it("uses the injected HTTP client", async () => {
+    let requestedUrl: string | undefined;
+    const responseText = [
+      { type: "response.output_item.done", item: { type: "compaction", encrypted_content: "opaque" } },
+      { type: "response.completed", response: { usage: undefined } },
+    ].map((event) => `data: ${JSON.stringify(event)}`).join("\n\n");
+    const client = HttpClient.make((request) => {
+      requestedUrl = request.url;
+      return Effect.succeed(HttpClientResponse.fromWeb(request, new Response(responseText, { status: 200 })));
+    });
+
+    const result = await Effect.runPromise(callRemoteCompactionEndpoint({
+      model: { provider: "openai", api: "openai-responses", id: "gpt-5.4" } as never,
+      apiKey: "test-key",
+      input: [],
+      tools: [],
+      parallelToolCalls: true,
+    }).pipe(Effect.provideService(HttpClient.HttpClient, client)));
+
+    assert.equal(requestedUrl, "https://api.openai.com/v1/responses");
+    assert.deepEqual(result.output, [{ type: "compaction", encrypted_content: "opaque" }]);
+  });
+
   it("reports unsupported models as a typed failure rather than a defect", async () => {
     const exit = await Effect.runPromiseExit(callRemoteCompactionEndpoint({
       model: { provider: "other", api: "other", id: "other" } as never,
