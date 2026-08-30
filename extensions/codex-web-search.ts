@@ -30,77 +30,84 @@ const webSearchTool = defineTool({
   label: "Codex Web Search",
   description: "Search the current web through Codex and return its cited response.",
   parameters,
-  async execute(_toolCallId, params, signal, onUpdate, ctx) {
-    const query = params.query.trim();
-    if (!query) throw new Error("Web search query must not be empty");
+  execute(_toolCallId, params, signal, onUpdate, ctx) {
+    const search = Effect.gen(function* () {
+      const query = params.query.trim();
+      if (!query) return yield* Effect.fail(new Error("Web search query must not be empty"));
 
-    onUpdate?.({ content: [{ type: "text", text: `Searching: ${query}` }], details: { phase: "searching" } });
-    const auth = await resolveCodexAuth(ctx);
-    if (!auth) throw new Error("Codex Web Search requires an OpenAI Codex login. Use /login first.");
-
-    const headers: Record<string, string> = {
-      ...stringHeaders(auth.headers),
-      Authorization: `Bearer ${auth.apiKey}`,
-      "Content-Type": "application/json",
-      originator: "pi",
-    };
-    const accountId = extractCodexAccountId(auth.apiKey);
-    if (accountId) headers["chatgpt-account-id"] = accountId;
-
-    const options: CodexSearchOptions = {
-      recency: params.recency,
-      domains: params.domains,
-    };
-    const combinedSignal = signal
-      ? AbortSignal.any([signal, AbortSignal.timeout(SEARCH_TIMEOUT_MS)])
-      : AbortSignal.timeout(SEARCH_TIMEOUT_MS);
-
-    try {
-      const { response, text } = await Effect.runPromise(Effect.tryPromise({
-        try: async () => {
-          const response = await fetch(CODEX_SEARCH_URL, {
-            method: "POST",
-            headers,
-            body: JSON.stringify(buildCodexSearchRequest(
-              query,
-              ctx.sessionManager.getSessionId(),
-              auth.model,
-              options,
-            )),
-            signal: combinedSignal,
-          });
-          return { response, text: await response.text() };
-        },
-        catch: (error) => error instanceof Error ? error : new Error(String(error)),
-      }), { signal: combinedSignal });
-      if (!response.ok) {
-        throw new Error(`Codex search error ${response.status}: ${redactCredential(text, auth.apiKey).slice(0, 500)}`);
+      yield* Effect.sync(() => {
+        onUpdate?.({ content: [{ type: "text", text: `Searching: ${query}` }], details: { phase: "searching" } });
+      });
+      const auth = yield* resolveCodexAuth(ctx);
+      if (!auth) {
+        return yield* Effect.fail(new Error("Codex Web Search requires an OpenAI Codex login. Use /login first."));
       }
 
-      const parsed = parseCodexSearchResponse(text);
-      const truncation = truncateHead(parsed.output, {
-        maxBytes: DEFAULT_MAX_BYTES,
-        maxLines: DEFAULT_MAX_LINES,
-      });
-      return {
-        content: [{
-          type: "text",
-          text: truncation.truncated
-            ? `${truncation.content}\n\n[Codex search output truncated.]`
-            : truncation.content,
-        }],
-        details: {
-          model: auth.model,
-          results: parsed.results,
-          truncated: truncation.truncated,
-        },
+      const headers: Record<string, string> = {
+        ...stringHeaders(auth.headers),
+        Authorization: `Bearer ${auth.apiKey}`,
+        "Content-Type": "application/json",
+        originator: "pi",
       };
-    } catch (error) {
-      const original = error instanceof Error ? error.message : String(error);
-      const message = redactCredential(original, auth.apiKey);
-      if (message === original) throw error;
-      throw new Error(message);
-    }
+      const accountId = extractCodexAccountId(auth.apiKey);
+      if (accountId) headers["chatgpt-account-id"] = accountId;
+
+      const options: CodexSearchOptions = {
+        recency: params.recency,
+        domains: params.domains,
+      };
+      return yield* Effect.gen(function* () {
+        const { response, text } = yield* Effect.tryPromise({
+          try: async (requestSignal) => {
+            const response = await fetch(CODEX_SEARCH_URL, {
+              method: "POST",
+              headers,
+              body: JSON.stringify(buildCodexSearchRequest(
+                query,
+                ctx.sessionManager.getSessionId(),
+                auth.model,
+                options,
+              )),
+              signal: requestSignal,
+            });
+            return { response, text: await response.text() };
+          },
+          catch: toError,
+        });
+        if (!response.ok) {
+          return yield* Effect.fail(
+            new Error(`Codex search error ${response.status}: ${text.slice(0, 500)}`),
+          );
+        }
+
+        const parsed = yield* Effect.try({
+          try: () => parseCodexSearchResponse(text),
+          catch: toError,
+        });
+        const truncation = truncateHead(parsed.output, {
+          maxBytes: DEFAULT_MAX_BYTES,
+          maxLines: DEFAULT_MAX_LINES,
+        });
+        return {
+          content: [{
+            type: "text" as const,
+            text: truncation.truncated
+              ? `${truncation.content}\n\n[Codex search output truncated.]`
+              : truncation.content,
+          }],
+          details: {
+            model: auth.model,
+            results: parsed.results,
+            truncated: truncation.truncated,
+          },
+        };
+      }).pipe(
+        Effect.timeout(SEARCH_TIMEOUT_MS),
+        Effect.catch((error) => Effect.fail(redactError(error, auth.apiKey))),
+      );
+    });
+
+    return Effect.runPromise(search, { signal });
   },
 });
 
@@ -108,22 +115,33 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool(webSearchTool);
 }
 
-async function resolveCodexAuth(ctx: ExtensionContext) {
+function resolveCodexAuth(ctx: ExtensionContext) {
   const model = ctx.model?.provider === "openai-codex"
     ? ctx.model
     : ctx.modelRegistry.getAll().find((candidate) => candidate.provider === "openai-codex");
-  if (!model) return undefined;
-  try {
-    const resolved = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-    if (!resolved.ok || !resolved.apiKey) return undefined;
-    return {
+  if (!model) return Effect.succeed(undefined);
+
+  return Effect.tryPromise({
+    try: () => ctx.modelRegistry.getApiKeyAndHeaders(model),
+    catch: toError,
+  }).pipe(
+    Effect.map((resolved) => !resolved.ok || !resolved.apiKey ? undefined : {
       apiKey: resolved.apiKey,
       model: model.id,
       headers: resolved.headers ?? {},
-    };
-  } catch {
-    return undefined;
-  }
+    }),
+    Effect.catch(() => Effect.succeed(undefined)),
+  );
+}
+
+function redactError(error: unknown, credential: string): Error {
+  const original = error instanceof Error ? error.message : String(error);
+  const message = redactCredential(original, credential);
+  return message === original && error instanceof Error ? error : new Error(message);
+}
+
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
 }
 
 function stringHeaders(headers: Record<string, string | null>): Record<string, string> {
