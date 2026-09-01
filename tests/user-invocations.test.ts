@@ -25,8 +25,8 @@ const command = (
 });
 
 const commands = [
-  command("simplify", "prompt", new URL("../prompts/simplify.md", import.meta.url)),
-  command("commit", "prompt", new URL("../prompts/commit.md", import.meta.url)),
+  command("first", "prompt", new URL("fixtures/prompts/first.md", import.meta.url)),
+  command("second", "prompt", new URL("fixtures/prompts/second.md", import.meta.url)),
   command("skill:frontend-design", "skill", new URL("../skills/frontend-design/SKILL.md", import.meta.url)),
 ];
 
@@ -38,7 +38,7 @@ test("the extension preserves compact display metadata outside model content", a
   } as never);
 
   const transformed = await handlers.get("input")?.(
-    { source: "interactive", text: "$simplify $commit" },
+    { source: "interactive", text: "$first $second" },
     { ui: { notify() {} } },
   );
   assert.equal(transformed.action, "transform");
@@ -49,7 +49,7 @@ test("the extension preserves compact display metadata outside model content", a
     content: [{ type: "text", text: transformed.text }],
   };
   const finalized = await handlers.get("message_end")?.({ message });
-  assert.equal(finalized.message.piUserInvocation, "$simplify $commit");
+  assert.equal(finalized.message.piUserInvocation, "$first $second");
   assert.deepEqual(finalized.message.content, message.content);
 });
 
@@ -75,14 +75,14 @@ test("autocomplete opens after a token boundary and includes skills", async () =
   const result = await provider.getSuggestions(["please $"], 0, "please $".length, {});
   assert.deepEqual(
     result.items.map((item: { value: string }) => item.value),
-    ["$simplify", "$commit", "$frontend-design"],
+    ["$first", "$second", "$frontend-design"],
   );
 });
 
 test("leading dollar invocations compose in user order", async () => {
-  const stack = parseInvocationStack("$simplify $commit keep tests focused", commands);
+  const stack = parseInvocationStack("$first $second keep tests focused", commands);
   assert.ok(stack);
-  assert.deepEqual(stack.commands.map((item) => item.invocationName), ["simplify", "commit"]);
+  assert.deepEqual(stack.commands.map((item) => item.invocationName), ["first", "second"]);
   assert.equal(stack.argumentsText, "keep tests focused");
 
   const expanded = await expandInvocationStack(stack);
@@ -98,22 +98,22 @@ test("skill invocations retain shared trailing instructions", async () => {
 });
 
 test("invocations expand at token boundaries within instructions", async () => {
-  const stack = parseInvocationStack("please $simplify this $commit", commands);
+  const stack = parseInvocationStack("please $first this $second", commands);
   assert.ok(stack);
-  assert.deepEqual(stack.commands.map((item) => item.invocationName), ["simplify", "commit"]);
+  assert.deepEqual(stack.commands.map((item) => item.invocationName), ["first", "second"]);
   assert.equal(stack.argumentsText, "please this");
   assert.match(await expandInvocationStack(stack), /please this$/);
 });
 
 test("unknown and escaped dollars remain ordinary input", () => {
   assert.equal(parseInvocationStack("$missing", commands), undefined);
-  assert.equal(parseInvocationStack("explain \\$simplify", commands), undefined);
+  assert.equal(parseInvocationStack("explain \\$first", commands), undefined);
 });
 
 test("prompt and skill name collisions require source-qualified invocations", () => {
   const colliding = [
-    command("review", "prompt", new URL("../prompts/commit.md", import.meta.url)),
-    command("review", "prompt", new URL("../prompts/simplify.md", import.meta.url)),
+    command("review", "prompt", new URL("fixtures/prompts/first.md", import.meta.url)),
+    command("review", "prompt", new URL("fixtures/prompts/second.md", import.meta.url)),
     command("skill:review", "skill", new URL("../skills/frontend-design/SKILL.md", import.meta.url)),
   ];
   assert.deepEqual(

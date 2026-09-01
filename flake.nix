@@ -113,8 +113,6 @@
             test -f ${agent}/extensions/sandbox/node_modules/effect/package.json
             mkdir home
             HOME="$PWD/home" PI_OFFLINE=1 pi --no-extensions -e ${sandbox}/index.ts --list-models >/dev/null
-            test -L ${agent}/prompts
-            test -f ${agent}/prompts/commit.md
             test -f ${agent}/skills/mcp-scripting/SKILL.md
             touch "$out"
           '';

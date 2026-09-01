@@ -1,7 +1,7 @@
 # Pi
 
 This is the Pi setup I use for day-to-day coding. Nix pins the agent,
-extensions, prompts, skills, and theme so I get the same setup on macOS and
+extensions, skills, and theme so I get the same setup on macOS and
 Linux.
 
 Most of the work in this repo is around shell execution. Commands run in a
@@ -59,7 +59,7 @@ separate `nix-config` repo.
   `pi-core-extensions`; notifications, title animation, and user input use the same
   pinned Effect v4 runtime while Pi callbacks remain boundary adapters. Type `$`
   at a token boundary to autocomplete prompts or skills; invocations such as
-  `$simplify $commit` compose in order.
+  `$frontend-design` expand before the request reaches the model.
 - [`nix`](nix) contains the pinned builds for Pi and every packaged extension.
 - [`apps/pi-terminal`](apps/pi-terminal) pins the upstream Pi 0.84.2 terminal
   client and the small Pi AI output-item hook needed for cached OpenAI

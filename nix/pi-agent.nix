@@ -39,7 +39,6 @@ stdenvNoCC.mkDerivation {
     ln -s ${coreExtensions}/user-input.ts "$out/extensions/user-input.ts"
     ln -s ${coreExtensions}/user-invocations.ts "$out/extensions/user-invocations.ts"
 
-    ln -s ${../prompts} "$out/prompts"
     ln -s ${../themes/gruvbox-dark-hard.json} "$out/themes/gruvbox-dark-hard.json"
 
     for skill in ${mcpAdapter}/skills/* ${../skills}/*; do
